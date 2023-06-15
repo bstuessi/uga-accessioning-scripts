@@ -44,6 +44,10 @@ if len(configuration_errors) > 0:
 # These are used for naming script outputs, so it will not cause an error if they don't match id naming conventions.
 collection_folder, accession_number = os.path.split(accession_folder)
 
+collection_folder = collection_folder + '/reports/risk_assessment'
+
+os.mkdir(collection_folder)
+
 # If there is already a FITS XML folder, updates the FITS folder to match the contents of the accession folder.
 # Otherwise, runs FITS to generate the FITS XML.
 fits_output = f"{collection_folder}/{accession_number}_FITS"

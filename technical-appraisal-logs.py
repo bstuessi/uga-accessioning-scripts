@@ -151,7 +151,7 @@ if __name__ == "__main__":
         # Alert the user if one is found with the same date and give them the option to cancel the process and prevent overwriting
         if man:
             if date in man:
-                todaysfile = man.rsplit('\\', 1)[-1]
+                todaysfile = man.rsplit('/', 1)[-1]
                 check = input(f'\nA file called "{todaysfile}" already exists in this location. Do you wish to overwrite it? Type Y or N: ')
                 if check.lower() in ['n', 'no']:
                     print(f'\nProcess cancelled. \n\nTo create a log of deleted files, run this script again with the "compare" parameter: python /path/to/script /path/to/accession/directory compare')
@@ -160,7 +160,7 @@ if __name__ == "__main__":
                     print('\nFile manifest will be saved to the accession folder. Working...')
 
         # Create the manifest CSV and a log of files to review
-        with open(f'{dir_to_log}\\initialmanifest_{date}.csv', "w", encoding="utf-8", newline='') as manifest, open(f'{dir_to_log}\\filestoreview_{date}.csv', "w", encoding="utf-8", newline='') as review_log:
+        with open(f'{dir_to_log.rsplit("/", 2)[0]}/reports/initialmanifest_{date}.csv', "w", encoding="utf-8", newline='') as manifest, open(f'{dir_to_log.rsplit("/", 2)[0]}/reports/filestoreview_{date}.csv', "w", encoding="utf-8", newline='') as review_log:
             wr_initman = csv.writer(manifest)
             wr_revlog = csv.writer(review_log)
             wr_initman.writerow(header)
@@ -215,7 +215,7 @@ if __name__ == "__main__":
     
     # If there's a "compare" argument, scan the directory and put current file information into a new dataframe
     if start_compare == "compare":
-        new_df = pd.DataFrame(columns=header[:-1])
+        new_df = pd.DataFrame(columns=header[:-2])
         for entry in scan_full_dir(dir_to_log):
             data = get_file_info(entry)
 
@@ -223,33 +223,38 @@ if __name__ == "__main__":
             if any(x in data[0] for x in log_docs):
                     continue
             else:
-                new_df.loc[len(new_df)] = data
+               # new_df.loc[len(new_df)] = data
+               df_data = pd.DataFrame([data], columns=header[:-2]) 
+               new_df = pd.concat([new_df, df_data], ignore_index=True)
 
         print('\nDeletion log will be saved to the accession folder. Working...')
+        print(new_df)
 
         # Find the initial file manifest and read it to a pandas dataframe
-        man_df = pd.DataFrame(columns = header)
-        man = find_init_manifest(dir_to_log)
+        man_df = pd.DataFrame(columns = header[:-2])
+        man = find_init_manifest(f'{dir_to_log.rsplit("/", 2)[0]}/reports/')
         df = pd.read_csv(man)
         man_df = pd.concat([man_df, df], axis=0)
-
+        print(man_df)
         # Concatenate the two dataframes and exclude logs
         deleted = pd.concat([man_df, new_df], ignore_index=True)
-        deleted[~deleted['File'].str.contains('|'.join(log_docs))]
+        print(deleted)
+        deleted[~deleted['File'].str.contains('|'.join(log_docs), na=False)]
         
         # Compare the file name and parent folder from the file paths in each dataframe to identify and drop any duplicates
-        deleted['FName'] = deleted['File'].astype(str).str.split('\\', -2).str[-1].str.strip()
+        deleted['FName'] = deleted['File'].astype(str).str.split('/').str[-1].str.strip()
+        print(deleted)
         deleted = deleted.drop_duplicates('FName', keep=False)
-
+        print(deleted)
         # Add a "Date Deleted" column with today's date
         deleted.drop(['DateModified'], axis=1, inplace=True)
         deleted.insert(3, 'DateDeleted', datetime.now().strftime("%Y-%m-%d"))
         deleted.drop(['FName'], axis=1, inplace=True)
 
         # Check to see if a deletion log already exists
-        del_log = find_deletion_log(dir_to_log)
+        del_log = find_deletion_log(f'{dir_to_log.rsplit("/", 2)[0]}/reports/')
         if del_log:
-            logfile = del_log.rsplit('\\', 1)[-1]
+            logfile = del_log.rsplit('/', 1)[-1]
             print(f'\nA file called "{logfile}" already exists in this location. If any additional deletions are found, they will be added to this file.')
             del_df = pd.read_csv(del_log)
 
@@ -258,7 +263,8 @@ if __name__ == "__main__":
             new_deletions[~new_deletions['File'].str.contains('|'.join(log_docs))]
 
             # Compare the file name and parent folder from the file paths in each dataframe to identify and drop any duplicates
-            new_deletions['FName'] = new_deletions['File'].astype(str).str.split('\\', -2).str[-1].str.strip()
+            
+            new_deletions['FName'] = new_deletions['File'].astype(str).str.split('/').str[-1].str.strip()
             new_deletions = new_deletions.drop_duplicates('FName', keep=False)
             new_deletions['DateDeleted'] = datetime.now().strftime("%Y-%m-%d")
             new_deletions.drop(['FName'], axis=1, inplace=True)
@@ -273,6 +279,7 @@ if __name__ == "__main__":
         
         # If no existing deletion log, write the dataframe of deleted files to a new CSV
         else:
-            deleted.to_csv(f'{dir_to_log}\\deletionlog_{date}.csv', encoding="utf-8", index=False)
+            deleted.to_csv(f'{dir_to_log.rsplit("/", 2)[0]}/reports/deletionlog_{date}.csv', encoding="utf-8", index=False)
 
     print(f'\nScript is finished running.')
+    
